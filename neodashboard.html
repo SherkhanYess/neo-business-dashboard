@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Neo Diamond — Карта зрелости направлений</title>
+<style>
+  :root{
+    --bg:#0e1015; --panel:#161a22; --panel2:#1d222c; --panel3:#222838; --border:#2a313d;
+    --text:#e7eaf0; --muted:#8b93a3; --accent:#6c8cff;
+    --low:#e0413b; --mid:#e0b62e; --high:#6fbf4f;
+    --ahead:#6c8cff; --lag:#e0772f; --sync:#5b6472;
+    --radius:14px;
+    font-family:'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:radial-gradient(circle at 20% -10%, #1b2030 0%, var(--bg) 60%); color:var(--text); min-height:100vh;}
+  .app{display:flex; min-height:100vh;}
+  .sidebar{width:300px; background:var(--panel); border-right:1px solid var(--border); padding:18px 14px; overflow-y:auto; flex:none;}
+  .sidebar h1{font-size:16px; margin:0 0 4px;}
+  .sidebar .sub{color:var(--muted); font-size:12px; margin-bottom:16px;}
+  .row{display:flex; align-items:center; gap:6px; padding:7px 8px; border-radius:8px; cursor:pointer; user-select:none; font-size:13.5px;}
+  .row:hover{background:var(--panel2);}
+  .row.active{background:#26314a; outline:1px solid var(--accent);}
+  .row .dot{width:9px; height:9px; border-radius:50%; flex:none; background:#444;}
+  .row .name{flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .row .lvl{font-size:10.5px; color:var(--muted); flex:none; max-width:90px; text-align:right;}
+  .children{margin-left:16px; border-left:1px dashed var(--border); padding-left:8px;}
+  .add-btn{background:none; border:1px dashed var(--border); color:var(--muted); border-radius:8px; padding:5px 8px; font-size:12px; cursor:pointer; margin-top:4px; width:100%;}
+  .add-btn:hover{color:var(--text); border-color:var(--accent);}
+  .icon-btn{background:none; border:none; color:var(--muted); cursor:pointer; font-size:13px; padding:2px 4px;}
+  .icon-btn:hover{color:#fff;}
+  .main{flex:1; padding:26px 34px; overflow-y:auto; min-width:0;}
+  .topbar{display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:18px; flex-wrap:wrap; gap:12px;}
+  .topbar h2{margin:0; font-size:22px;}
+  .topbar .sub{color:var(--muted); font-size:13px; margin-top:4px;}
+  .legend{display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--muted); align-items:center;}
+  .legend span{display:flex; align-items:center; gap:5px;}
+  .legend .sw{width:10px;height:10px;border-radius:50%;}
+  .priority{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:26px;}
+  @media (max-width:760px){.priority{grid-template-columns:1fr;}}
+  .pri-box{background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:14px 16px;}
+  .pri-box h4{margin:0 0 8px; font-size:13px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px;}
+  .pri-item{display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--border); font-size:13px; cursor:pointer;}
+  .pri-item:last-child{border-bottom:none;}
+  .pri-item:hover{color:var(--accent);}
+  .pri-item .val{font-weight:700; font-size:12px;}
+  .grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(190px,1fr)); gap:14px; margin-bottom:30px;}
+  .card{background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); padding:16px; cursor:pointer; transition:.15s; position:relative; overflow:hidden;}
+  .card:hover{transform:translateY(-2px); border-color:var(--accent);}
+  .card .bar{position:absolute; left:0; top:0; bottom:0; width:5px;}
+  .card .title{font-weight:600; font-size:14px; margin-bottom:6px; padding-left:6px;}
+  .card .path{font-size:11px; color:var(--muted); margin-bottom:10px; padding-left:6px;}
+  .card .scorewrap{display:flex; align-items:center; gap:8px; padding-left:6px;}
+  .card .badge{font-size:11px; padding:2px 8px; border-radius:20px; font-weight:600;}
+  .card .num{font-size:20px; font-weight:700;}
+  .progress{height:5px; background:#2a313d; border-radius:4px; margin-top:10px; overflow:hidden;}
+  .progress > div{height:100%; border-radius:4px;}
+  .empty{color:var(--muted); font-size:13px; padding:30px; text-align:center; border:1px dashed var(--border); border-radius:var(--radius);}
+  .section-title{font-size:13px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin:26px 0 10px; display:flex; justify-content:space-between; align-items:center;}
+  .btn{background:var(--accent); color:#fff; border:none; border-radius:8px; padding:9px 16px; font-size:13px; cursor:pointer; font-weight:600;}
+  .btn.secondary{background:none; border:1px solid var(--border); color:var(--text);}
+  .btn.small{padding:6px 10px; font-size:12px;}
+  .headrow{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px;}
+  .hint{font-size:11.5px; color:var(--muted); margin-top:14px; line-height:1.5;}
+  .levelchip{font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); border:1px solid var(--border); border-radius:6px; padding:2px 7px; display:inline-block; margin-bottom:6px;}
+
+  .item-row{display:flex; align-items:center; gap:10px; background:var(--panel2); border:1px solid var(--border); border-radius:10px; padding:8px 12px; margin-bottom:8px;}
+  .item-row .iname{flex:1; font-size:13px; font-weight:600;}
+  .item-row .iname[contenteditable]{outline:none;}
+  .item-row input[type=range]{width:120px; accent-color:var(--accent);}
+  .item-row .ival{width:38px; text-align:right; font-size:12px; font-weight:700;}
+
+  .crit{background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:16px 18px; margin-bottom:16px;}
+  .crit-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;}
+  .crit-head .ctitle{font-size:14px; font-weight:700;}
+  .crit-head .cscore{font-size:13px; font-weight:700; padding:3px 10px; border-radius:20px;}
+  .crit-desc{font-size:11.5px; color:var(--muted); margin-bottom:12px; line-height:1.5;}
+
+  .metric-block{border:1px solid var(--border); border-radius:10px; padding:10px 12px; margin-bottom:10px; background:var(--panel2);}
+  .metric-block-top{display:flex; gap:8px; align-items:center; margin-bottom:8px;}
+  .metric-block-top .mname{flex:1; font-weight:600; font-size:13px;}
+  .metric-block-top .mname[contenteditable]{outline:none;}
+  .metric-row{display:flex; gap:8px; align-items:center; margin-bottom:6px; flex-wrap:wrap;}
+  .metric-row label{font-size:11px; color:var(--muted); flex:none; width:62px;}
+  .metric-row input[type=text], .metric-row input[type=number]{
+    background:#11141b; border:1px solid var(--border); color:var(--text); border-radius:6px; padding:5px 8px; font-size:12px;
+  }
+  .thresholds{margin-top:8px;}
+  .th-row{display:flex; gap:6px; align-items:center; margin-bottom:5px;}
+  .th-row input[type=number]{width:70px;}
+  .th-row input[type=text]{flex:1;}
+  .th-cur{margin-top:8px; font-size:12px; padding:6px 10px; border-radius:8px; display:inline-block;}
+
+  .checklist label{display:flex; align-items:center; gap:8px; font-size:13px; padding:6px 0; cursor:pointer;}
+  .checklist input{accent-color:var(--accent); width:16px; height:16px;}
+  .checklist textarea{width:100%; margin-top:6px;}
+  textarea{background:#11141b; border:1px solid var(--border); color:var(--text); border-radius:8px; padding:8px; font-size:12.5px; font-family:inherit; resize:vertical;}
+
+  .scale-stage{display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap;}
+  .scale-stage .sname{flex:1; min-width:140px; font-size:13px; background:#11141b; border:1px solid var(--border); color:var(--text); border-radius:6px; padding:6px 8px;}
+  .scale-stage select{background:#11141b; border:1px solid var(--border); color:var(--text); border-radius:6px; padding:6px 8px; font-size:12.5px;}
+  .pos-chip{display:inline-flex; align-items:center; gap:6px; background:var(--panel3); border:1px solid var(--border); border-radius:20px; padding:4px 10px 4px 12px; font-size:12px; margin:0 6px 6px 0;}
+  .pos-chip input{background:transparent;border:none;color:var(--text);font-size:12px;width:90px;}
+  .pos-chip button{background:none;border:none;color:var(--muted);cursor:pointer;}
+  .scale-summary{margin-top:10px; font-size:12.5px; color:var(--muted);}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="sidebar">
+    <h1>🏰 Neo Diamond</h1>
+    <div class="sub">Зона → Функция → Направление</div>
+    <div id="tree"></div>
+    <button class="add-btn" id="addFrontBtn">+ Добавить зону</button>
+    <div class="hint"><b>Зона</b> (Маркетинг, Продажи...) — просто контейнер, не оценивается.<br><b>Функция</b> (Product, Promotion...) — не оценивается числом, но показывает синхронность с другими функциями той же зоны.<br><b>Направление</b> (Instagram, новая линейка...) — единственный уровень с реальной оценкой по 3 критериям.</div>
+  </div>
+  <div class="main">
+    <div class="topbar">
+      <div>
+        <h2>Карта зрелости</h2>
+        <div class="sub" id="overallSub">Загрузка...</div>
+      </div>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--low)"></i>0-39%</span>
+        <span><i class="sw" style="background:var(--mid)"></i>40-69%</span>
+        <span><i class="sw" style="background:var(--high)"></i>70-100%</span>
+        <span style="margin-left:10px;"><i class="sw" style="background:var(--ahead)"></i>опережает</span>
+        <span><i class="sw" style="background:var(--lag)"></i>отстаёт</span>
+      </div>
+    </div>
+    <div id="priorityPanel" class="priority"></div>
+    <div id="content"></div>
+  </div>
+</div>
+
+<script>
+/* ===== Жёсткая иерархия по глубине =====
+depth 0 = Зона (контейнер, не оценивается)
+depth 1 = Функция (контейнер, оценка = синхронность с соседними функциями зоны)
+depth 2 = Направление (лист, единственный оцениваемый уровень: items + criteria)
+======================================== */
+
+function defaultTree(){
+  return [
+    zone('Маркетинг', [
+      func('Product (продукт)', [dir('Текущая линейка'), dir('Новая продуктовая линейка (план)')]),
+      func('Price (цена)', [dir('Ценообразование')]),
+      func('Place (дистрибуция)', [dir('Шоурум как точка продаж'), dir('Онлайн / сайт')]),
+      func('Promotion (продвижение)', [dir('Instagram (платный трафик)'), dir('Контент / органика'), dir('3D-конфигуратор как канал')])
+    ]),
+    zone('Продажи', [
+      func('Воронка', [dir('Квалификация лидов (Danelya)'), dir('Шоурум / закрытие сделок')]),
+      func('Системы', [dir('amoCRM и автоматизации')])
+    ]),
+    zone('Производство', [
+      func('Операции', [dir('Мастерская / сроки'), dir('Сложные / индивидуальные заказы')])
+    ]),
+    zone('Финансы', [
+      func('Учёт', [dir('Юнит-экономика'), dir('Кэш-флоу')])
+    ])
+  ];
+}
+function zone(name, children){ return {id:uid(), name, kind:'zone', children}; }
+function func(name, children){ return {id:uid(), name, kind:'function', children}; }
+function dir(name){ return {id:uid(), name, kind:'direction', items:[], criteria:emptyCriteria(), children:[]}; }
+function emptyCriteria(){
+  return {
+    effectiveness:{metrics:[]},
+    systemic:{checks:[
+      {id:uid(), label:'Есть письменный регламент / описанный процесс', checked:false},
+      {id:uid(), label:'Есть назначенный ответственный', checked:false},
+      {id:uid(), label:'Есть команда вокруг направления (не только сам Шерхан)', checked:false},
+      {id:uid(), label:'Регулярно соблюдается (не только "когда вспомнили")', checked:false}
+    ], note:''},
+    scale:{stages:[], positions:[]}
+  };
+}
+function uid(){return 'n'+Math.random().toString(36).slice(2,10);}
+
+let TREE = [];
+let ACTIVE_ID = null;
+
+async function loadData(){
+  try{
+    const raw = localStorage.getItem('neo_maturity_tree_v3');
+    TREE = raw ? JSON.parse(raw) : defaultTree();
+  }catch(e){ TREE = defaultTree(); }
+  render();
+}
+async function saveTree(){ try{ localStorage.setItem('neo_maturity_tree_v3', JSON.stringify(TREE)); }catch(e){console.error('Storage error:', e);} }
+
+/* ---------- Helpers ---------- */
+function findNode(id, nodes=TREE, parents=[]){
+  for(const n of nodes){
+    if(n.id===id) return {node:n, parents};
+    const found = findNode(id, n.children||[], [...parents, n]);
+    if(found) return found;
+  }
+  return null;
+}
+function depthOf(parents){ return parents.length; }
+function allDirectionLeaves(node){
+  if(node.kind==='direction') return [node];
+  return (node.children||[]).flatMap(allDirectionLeaves);
+}
+function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ---- Scoring: only meaningful for direction nodes ---- */
+function metricScore(m){
+  if(!m.thresholds || m.thresholds.length===0) return null;
+  const sorted = [...m.thresholds].sort((a,b)=>a.value-b.value);
+  let idx = 0;
+  for(let i=0;i<sorted.length;i++){ if(m.value>=sorted[i].value) idx=i; }
+  return Math.round(((idx+1)/sorted.length)*100);
+}
+function metricLabel(m){
+  if(!m.thresholds || m.thresholds.length===0) return 'нет порогов';
+  const sorted = [...m.thresholds].sort((a,b)=>a.value-b.value);
+  let label = sorted[0]?.label || '—';
+  for(const t of sorted){ if(m.value>=t.value) label = t.label; }
+  return label;
+}
+function effectivenessScore(node){
+  const metrics = node.criteria?.effectiveness?.metrics || [];
+  const scored = metrics.map(metricScore).filter(v=>v!==null);
+  if(scored.length===0) return null;
+  return Math.round(scored.reduce((a,b)=>a+b,0)/scored.length);
+}
+function systemicScore(node){
+  const checks = node.criteria?.systemic?.checks || [];
+  if(checks.length===0) return null;
+  const on = checks.filter(c=>c.checked).length;
+  return Math.round((on/checks.length)*100);
+}
+function scaleScore(node){
+  const stages = node.criteria?.scale?.stages || [];
+  if(stages.length===0) return null;
+  const assigned = stages.filter(s=>s.posId);
+  if(assigned.length===0) return 0;
+  const distinct = new Set(assigned.map(s=>s.posId)).size;
+  return Math.round((distinct/stages.length)*100);
+}
+function directionScore(node){
+  const e = effectivenessScore(node), s = systemicScore(node), sc = scaleScore(node);
+  const vals = [e,s,sc].filter(v=>v!==null);
+  if(vals.length===0) return null;
+  return Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
+}
+// avg of direction leaves under any container (zone or function) — used internally, never shown as a "score" for zone, only used to derive function balance & zone summary text
+function containerAvg(node){
+  const leaves = allDirectionLeaves(node);
+  const scored = leaves.map(directionScore).filter(v=>v!==null);
+  if(scored.length===0) return null;
+  return Math.round(scored.reduce((a,b)=>a+b,0)/scored.length);
+}
+function colorFor(score){
+  if(score===null) return '#444';
+  if(score<40) return 'var(--low)';
+  if(score<70) return 'var(--mid)';
+  return 'var(--high)';
+}
+// Balance of a function vs its sibling functions within the same zone
+function functionBalance(node, siblings){
+  const mine = containerAvg(node);
+  if(mine===null) return null;
+  const others = siblings.filter(s=>s.id!==node.id).map(containerAvg).filter(v=>v!==null);
+  const all = [mine, ...others];
+  if(all.length<2) return {type:'solo', mine, mean:mine};
+  const mean = Math.round(all.reduce((a,b)=>a+b,0)/all.length);
+  const diff = mine-mean;
+  if(diff>=15) return {type:'ahead', mine, mean, diff};
+  if(diff<=-15) return {type:'lag', mine, mean, diff};
+  return {type:'sync', mine, mean, diff};
+}
+function balanceColor(b){
+  if(!b) return '#444';
+  if(b.type==='ahead') return 'var(--ahead)';
+  if(b.type==='lag') return 'var(--lag)';
+  return 'var(--sync)';
+}
+function balanceLabel(b){
+  if(!b) return 'нет данных';
+  if(b.type==='solo') return `${b.mine}% (нет других функций для сравнения)`;
+  if(b.type==='ahead') return `⬆ опережает соседей (${b.mine}% vs ${b.mean}%)`;
+  if(b.type==='lag') return `⬇ отстаёт от соседей (${b.mine}% vs ${b.mean}%)`;
+  return `✓ синхронно с соседями (${b.mine}% vs ${b.mean}%)`;
+}
+
+function pathName(parents, node){ return [...parents.map(p=>p.name), node.name].join(' / '); }
+function kindLabel(k){ return k==='zone'?'Зона':k==='function'?'Функция':'Направление'; }
+
+/* ---------- Render root ---------- */
+function render(){ renderTree(); renderPriority(); renderMain(); }
+window.__nav = (id)=>{ ACTIVE_ID = id; render(); };
+
+function renderTree(){
+  const root = document.getElementById('tree');
+  root.innerHTML='';
+  root.appendChild(renderNodes(TREE, []));
+}
+function renderNodes(nodes, parents){
+  const wrap = document.createElement('div');
+  nodes.forEach(n=>{
+    const div = document.createElement('div');
+    let dot='#444', lvlText='';
+    if(n.kind==='direction'){
+      const sc = directionScore(n);
+      dot = colorFor(sc); lvlText = sc!==null? sc+'%' : '—';
+    } else if(n.kind==='function'){
+      const b = functionBalance(n, parents[parents.length-1]?.children || []);
+      dot = balanceColor(b); lvlText = b? (b.type==='solo'?'?':(b.type==='ahead'?'⬆':b.type==='lag'?'⬇':'✓')) : '—';
+    } else {
+      lvlText='';
+    }
+    const row = document.createElement('div');
+    row.className='row'+(ACTIVE_ID===n.id?' active':'');
+    row.innerHTML = `<span class="dot" style="background:${dot}"></span>
+      <span class="name">${escapeHtml(n.name)}</span>
+      <span class="lvl">${lvlText}</span>
+      ${n.kind!=='direction' ? `<button class="icon-btn" data-act="add" title="Добавить подпункт">＋</button>` : ''}
+      <button class="icon-btn" data-act="del" title="Удалить">✕</button>`;
+    row.querySelector('.name').onclick = ()=>{ ACTIVE_ID = n.id; render(); };
+    if(n.kind!=='direction'){
+      row.querySelector('[data-act=add]').onclick = (e)=>{ e.stopPropagation(); addChild(n, parents); };
+    }
+    row.querySelector('[data-act=del]').onclick = (e)=>{ e.stopPropagation(); deleteNode(n.id, parents); };
+    div.appendChild(row);
+    if(n.children && n.children.length){
+      const childWrap = document.createElement('div');
+      childWrap.className='children';
+      childWrap.appendChild(renderNodes(n.children, [...parents, n]));
+      div.appendChild(childWrap);
+    }
+    wrap.appendChild(div);
+  });
+  return wrap;
+}
+function addChild(parentNode, parents){
+  const depth = depthOf(parents)+1; // depth of parentNode itself
+  const name = prompt(depth===0 ? 'Название функции:' : 'Название направления:');
+  if(!name) return;
+  parentNode.children = parentNode.children || [];
+  if(depth===0){ parentNode.children.push(func(name, [])); }
+  else { parentNode.children.push(dir(name)); }
+  saveTree(); render();
+}
+document.getElementById('addFrontBtn').onclick = ()=>{
+  const name = prompt('Название новой зоны:');
+  if(!name) return;
+  TREE.push(zone(name, []));
+  saveTree(); render();
+};
+function deleteNode(id, parents){
+  if(!confirm('Удалить этот узел и всё, что внутри?')) return;
+  if(parents.length===0){ TREE = TREE.filter(n=>n.id!==id); }
+  else { const parent = parents[parents.length-1]; parent.children = parent.children.filter(c=>c.id!==id); }
+  if(ACTIVE_ID===id) ACTIVE_ID=null;
+  saveTree(); render();
+}
+
+/* ---------- Priority panel (based only on Направления) ---------- */
+function renderPriority(){
+  const panel = document.getElementById('priorityPanel');
+  const leaves = TREE.flatMap(allDirectionLeaves);
+  const withScore = leaves.map(l=>({leaf:l, score:directionScore(l)})).filter(x=>x.score!==null);
+
+  const growth = [...withScore].sort((a,b)=>a.score-b.score).slice(0,6);
+  const strong = [...withScore].filter(x=>x.score>=70).sort((a,b)=>b.score-a.score).slice(0,6);
+
+  panel.innerHTML = `
+    <div class="pri-box">
+      <h4>🔥 Больше всего запаса роста (направления)</h4>
+      ${growth.length ? growth.map(x=>`<div class="pri-item" onclick="window.__nav('${x.leaf.id}')"><span>${escapeHtml(x.leaf.name)}</span><span class="val" style="color:${colorFor(x.score)}">${x.score}%</span></div>`).join('') : '<div class="hint">Заполни критерии хотя бы у одного направления.</div>'}
+    </div>
+    <div class="pri-box">
+      <h4>🏁 Сильные направления (70%+)</h4>
+      ${strong.length ? strong.map(x=>`<div class="pri-item" onclick="window.__nav('${x.leaf.id}')"><span>${escapeHtml(x.leaf.name)}</span><span class="val" style="color:var(--high)">${x.score}%</span></div>`).join('') : '<div class="hint">Пока ничего не достигло 70%+.</div>'}
+    </div>`;
+}
+
+/* ---------- Main ---------- */
+function renderMain(){
+  const content = document.getElementById('content');
+  content.innerHTML='';
+  const allLeaves = TREE.flatMap(allDirectionLeaves);
+  const scored = allLeaves.map(directionScore).filter(v=>v!==null);
+  const overall = scored.length ? Math.round(scored.reduce((a,b)=>a+b,0)/scored.length) : null;
+  document.getElementById('overallSub').textContent = overall!==null ? `Средняя зрелость по всем направлениям: ${overall}%` : 'Пока нет оценок.';
+
+  if(ACTIVE_ID){
+    const found = findNode(ACTIVE_ID);
+    if(found){ renderFocusedView(content, found.node, found.parents); return; }
+  }
+  renderOverview(content);
+}
+function renderOverview(content){
+  const title = document.createElement('div');
+  title.className='section-title';
+  title.innerHTML = `<span>Все зоны</span>`;
+  content.appendChild(title);
+  if(TREE.length===0){ content.innerHTML += `<div class="empty">Дерево пустое. Добавь зону слева.</div>`; return; }
+  const grid = document.createElement('div');
+  grid.className='grid';
+  TREE.forEach(n=>grid.appendChild(makeZoneCard(n)));
+  content.appendChild(grid);
+}
+function makeZoneCard(node){
+  const avg = containerAvg(node);
+  const card = document.createElement('div');
+  card.className='card';
+  card.innerHTML = `<div class="bar" style="background:${colorFor(avg)}"></div>
+    <div class="levelchip">Зона</div>
+    <div class="title">${escapeHtml(node.name)}</div>
+    <div class="path">${(node.children||[]).length} функций</div>
+    <div class="scorewrap"><div class="num" style="font-size:15px;color:var(--muted);">${avg!==null?'~'+avg+'%':'—'}</div></div>`;
+  card.onclick = ()=>{ ACTIVE_ID = node.id; render(); };
+  return card;
+}
+function makeFunctionCard(node, siblings){
+  const b = functionBalance(node, siblings);
+  const card = document.createElement('div');
+  card.className='card';
+  card.innerHTML = `<div class="bar" style="background:${balanceColor(b)}"></div>
+    <div class="levelchip">Функция</div>
+    <div class="title">${escapeHtml(node.name)}</div>
+    <div class="path">${(node.children||[]).length} направлений</div>
+    <div class="scorewrap"><div class="badge" style="background:${balanceColor(b)}22;color:${balanceColor(b)}">${balanceLabel(b)}</div></div>`;
+  card.onclick = ()=>{ ACTIVE_ID = node.id; render(); };
+  return card;
+}
+function makeDirectionCard(node){
+  const score = directionScore(node);
+  const card = document.createElement('div');
+  card.className='card';
+  card.innerHTML = `<div class="bar" style="background:${colorFor(score)}"></div>
+    <div class="levelchip">Направление</div>
+    <div class="title">${escapeHtml(node.name)}</div>
+    <div class="path">${node.items&&node.items.length? node.items.length+' элементов':'нет элементов'}</div>
+    <div class="scorewrap"><div class="num">${score!==null?score+'%':'—'}</div></div>
+    <div class="progress"><div style="width:${score||0}%;background:${colorFor(score)}"></div></div>`;
+  card.onclick = ()=>{ ACTIVE_ID = node.id; render(); };
+  return card;
+}
+
+function renderFocusedView(content, node, parents){
+  const crumb = document.createElement('div');
+  crumb.className='section-title';
+  crumb.innerHTML = `<span>${parents.map(p=>`<span style="cursor:pointer" onclick="window.__nav('${p.id}')">${escapeHtml(p.name)}</span>`).join(' / ')}${parents.length?' / ':''}<b style="color:var(--text)">${escapeHtml(node.name)}</b></span><span style="cursor:pointer;color:var(--accent)" onclick="window.__nav(null)">← все зоны</span>`;
+  content.appendChild(crumb);
+
+  const headCard = document.createElement('div');
+  headCard.style.cssText='background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:20px;';
+
+  if(node.kind==='zone'){
+    const avg = containerAvg(node);
+    headCard.innerHTML = `<div class="levelchip">Зона — не оценивается напрямую</div><div style="font-size:18px;font-weight:700;">${escapeHtml(node.name)}</div>
+      <div style="color:var(--muted);font-size:12.5px;margin-top:3px;">Справочно: средняя зрелость направлений внутри ~${avg!==null?avg+'%':'—'}</div>`;
+    content.appendChild(headCard);
+    const grid = document.createElement('div');
+    grid.className='grid';
+    (node.children||[]).forEach(c=>grid.appendChild(makeFunctionCard(c, node.children)));
+    if((node.children||[]).length===0) grid.innerHTML = `<div class="empty">Нет функций. Добавь через ＋ в дереве слева.</div>`;
+    content.appendChild(grid);
+    return;
+  }
+
+  if(node.kind==='function'){
+    const b = functionBalance(node, parents[parents.length-1]?.children || []);
+    headCard.innerHTML = `<div class="levelchip">Функция — синхронность, не абсолютная оценка</div><div style="font-size:18px;font-weight:700;">${escapeHtml(node.name)}</div>
+      <div style="color:var(--muted);font-size:12.5px;margin-top:3px;">${balanceLabel(b)}</div>`;
+    content.appendChild(headCard);
+    const grid = document.createElement('div');
+    grid.className='grid';
+    (node.children||[]).forEach(c=>grid.appendChild(makeDirectionCard(c)));
+    if((node.children||[]).length===0) grid.innerHTML = `<div class="empty">Нет направлений. Добавь через ＋ в дереве слева.</div>`;
+    content.appendChild(grid);
+    return;
+  }
+
+  // direction — the only level with real scoring
+  const score = directionScore(node);
+  headCard.innerHTML = `<div class="levelchip">Направление — оценивается</div><div style="font-size:18px;font-weight:700;">${escapeHtml(node.name)}</div>
+    <div style="color:var(--muted);font-size:12.5px;margin-top:3px;">${score!==null?score+'% зрелости':'Пока нет оценок'}</div>`;
+  content.appendChild(headCard);
+
+  const itemsTitle = document.createElement('div');
+  itemsTitle.className='section-title';
+  itemsTitle.innerHTML = `<span>Элементы внутри (продукты, кампании и т.п.)</span><button class="btn small" id="addItemBtn">+ Элемент</button>`;
+  content.appendChild(itemsTitle);
+  const itemsWrap = document.createElement('div');
+  content.appendChild(itemsWrap);
+  renderItems(node, itemsWrap);
+  document.getElementById('addItemBtn').onclick = ()=>{
+    const name = prompt('Название элемента:');
+    if(!name) return;
+    node.items = node.items || [];
+    node.items.push({id:uid(), name, completion:0});
+    saveTree(); render();
+  };
+
+  const critTitle = document.createElement('div');
+  critTitle.className='section-title';
+  critTitle.innerHTML = `<span>Золотые критерии зрелости</span>`;
+  content.appendChild(critTitle);
+
+  content.appendChild(renderEffectiveness(node));
+  content.appendChild(renderSystemic(node));
+  content.appendChild(renderScale(node));
+}
+
+/* ---------- ITEMS ---------- */
+function renderItems(node, wrap){
+  wrap.innerHTML='';
+  if(!node.items || node.items.length===0){
+    wrap.innerHTML = `<div class="empty" style="margin-bottom:16px;">Нет элементов. Например для "Новая продуктовая линейка" можно перечислить каждый продукт и трекать его готовность.</div>`;
+    return;
+  }
+  node.items.forEach(it=>{
+    const row = document.createElement('div');
+    row.className='item-row';
+    row.innerHTML = `
+      <div class="iname" contenteditable="true">${escapeHtml(it.name)}</div>
+      <input type="range" min="0" max="100" value="${it.completion}">
+      <div class="ival">${it.completion}%</div>
+      <button class="icon-btn" title="Удалить">✕</button>`;
+    const slider = row.querySelector('input');
+    const val = row.querySelector('.ival');
+    slider.oninput = ()=>{ val.textContent = slider.value+'%'; };
+    slider.onchange = ()=>{ it.completion = parseInt(slider.value); saveTree(); };
+    row.querySelector('.iname').onblur = (e)=>{ it.name = e.target.textContent.trim()||it.name; saveTree(); };
+    row.querySelector('button').onclick = ()=>{ node.items = node.items.filter(x=>x.id!==it.id); saveTree(); render(); };
+    wrap.appendChild(row);
+  });
+}
+
+/* ---------- EFFECTIVENESS ---------- */
+function renderEffectiveness(node){
+  const c = node.criteria.effectiveness;
+  const box = document.createElement('div');
+  box.className='crit';
+  const score = effectivenessScore(node);
+  box.innerHTML = `<div class="crit-head"><div class="ctitle">1. Эффективность</div><div class="cscore" style="background:${colorFor(score)}22;color:${colorFor(score)}">${score!==null?score+'%':'нет данных'}</div></div>
+    <div class="crit-desc">1-3 метрики, которые лучше всего показывают результат направления. Сам задай единицу измерения и пороги зрелости.</div>
+    <div id="metricsHolder"></div>
+    <button class="btn secondary small" id="addMetricBtn">+ Метрика</button>`;
+  const holder = box.querySelector('#metricsHolder');
+  (c.metrics||[]).forEach(m=>holder.appendChild(renderMetricBlock(node, m)));
+  box.querySelector('#addMetricBtn').onclick = ()=>{
+    if((c.metrics||[]).length>=3){ alert('Максимум 3 метрики — выбери самые важные.'); return; }
+    const name = prompt('Название метрики:');
+    if(!name) return;
+    c.metrics = c.metrics || [];
+    c.metrics.push({id:uid(), name, unit:'%', value:0, thresholds:[
+      {value:0, label:'Слабо'}, {value:50, label:'Средне'}, {value:80, label:'Сильно'}
+    ]});
+    saveTree(); render();
+  };
+  return box;
+}
+function renderMetricBlock(node, m){
+  const div = document.createElement('div');
+  div.className='metric-block';
+  const score = metricScore(m);
+  div.innerHTML = `
+    <div class="metric-block-top">
+      <div class="mname" contenteditable="true">${escapeHtml(m.name)}</div>
+      <button class="icon-btn" data-del>✕</button>
+    </div>
+    <div class="metric-row">
+      <label>Единица</label><input type="text" data-unit value="${escapeHtml(m.unit)}" placeholder="шт, %, ₸...">
+      <label style="width:auto;">Текущее значение</label><input type="number" data-val value="${m.value}">
+    </div>
+    <div class="thresholds" data-thresholds></div>
+    <button class="btn secondary small" data-addth>+ Порог уровня</button>
+    <div class="th-cur" style="background:${colorFor(score)}22;color:${colorFor(score)}">Текущий уровень: ${metricLabel(m)} (${score!==null?score+'%':'—'})</div>
+  `;
+  const thHolder = div.querySelector('[data-thresholds]');
+  function renderThresholds(){
+    thHolder.innerHTML='';
+    (m.thresholds||[]).sort((a,b)=>a.value-b.value).forEach(t=>{
+      const row = document.createElement('div');
+      row.className='th-row';
+      row.innerHTML = `<input type="number" value="${t.value}"><input type="text" value="${escapeHtml(t.label)}" placeholder="Название уровня"><button class="icon-btn">✕</button>`;
+      row.children[0].onchange = (e)=>{ t.value = parseFloat(e.target.value)||0; saveTree(); rerenderCurrent(); };
+      row.children[1].onchange = (e)=>{ t.label = e.target.value; saveTree(); rerenderCurrent(); };
+      row.children[2].onclick = ()=>{ m.thresholds = m.thresholds.filter(x=>x!==t); saveTree(); render(); };
+      thHolder.appendChild(row);
+    });
+  }
+  function rerenderCurrent(){
+    const sc = metricScore(m);
+    div.querySelector('.th-cur').textContent = `Текущий уровень: ${metricLabel(m)} (${sc!==null?sc+'%':'—'})`;
+    div.querySelector('.th-cur').style.background = colorFor(sc)+'22';
+    div.querySelector('.th-cur').style.color = colorFor(sc);
+  }
+  renderThresholds();
+  div.querySelector('[data-unit]').onchange = (e)=>{ m.unit = e.target.value; saveTree(); };
+  div.querySelector('[data-val]').onchange = (e)=>{ m.value = parseFloat(e.target.value)||0; saveTree(); rerenderCurrent(); renderTree(); renderPriority(); };
+  div.querySelector('.mname').onblur = (e)=>{ m.name = e.target.textContent.trim()||m.name; saveTree(); };
+  div.querySelector('[data-del]').onclick = ()=>{ node.criteria.effectiveness.metrics = node.criteria.effectiveness.metrics.filter(x=>x.id!==m.id); saveTree(); render(); };
+  div.querySelector('[data-addth]').onclick = ()=>{
+    m.thresholds = m.thresholds || [];
+    m.thresholds.push({value:0, label:'Новый уровень'});
+    saveTree(); render();
+  };
+  return div;
+}
+
+/* ---------- SYSTEMIC ---------- */
+function renderSystemic(node){
+  const c = node.criteria.systemic;
+  const score = systemicScore(node);
+  const box = document.createElement('div');
+  box.className='crit';
+  box.innerHTML = `<div class="crit-head"><div class="ctitle">2. Системность</div><div class="cscore" style="background:${colorFor(score)}22;color:${colorFor(score)}">${score!==null?score+'%':'нет данных'}</div></div>
+    <div class="crit-desc">Насколько у направления понятные процессы, регламент и команда вокруг него.</div>
+    <div class="checklist" id="checksHolder"></div>
+    <button class="btn secondary small" id="addCheckBtn">+ Свой пункт</button>
+    <textarea id="sysNote" rows="2" placeholder="Заметка: чего не хватает для следующего уровня...">${escapeHtml(c.note||'')}</textarea>`;
+  const holder = box.querySelector('#checksHolder');
+  (c.checks||[]).forEach(chk=>{
+    const lbl = document.createElement('label');
+    lbl.innerHTML = `<input type="checkbox" ${chk.checked?'checked':''}><span contenteditable="true" style="flex:1;">${escapeHtml(chk.label)}</span><button class="icon-btn">✕</button>`;
+    lbl.querySelector('input').onchange = (e)=>{ chk.checked = e.target.checked; saveTree(); render(); };
+    lbl.querySelector('span').onblur = (e)=>{ chk.label = e.target.textContent.trim()||chk.label; saveTree(); };
+    lbl.querySelector('button').onclick = (e)=>{ e.preventDefault(); c.checks = c.checks.filter(x=>x.id!==chk.id); saveTree(); render(); };
+    holder.appendChild(lbl);
+  });
+  box.querySelector('#addCheckBtn').onclick = ()=>{
+    const label = prompt('Новый пункт чек-листа:');
+    if(!label) return;
+    c.checks = c.checks || [];
+    c.checks.push({id:uid(), label, checked:false});
+    saveTree(); render();
+  };
+  box.querySelector('#sysNote').onchange = (e)=>{ c.note = e.target.value; saveTree(); };
+  return box;
+}
+
+/* ---------- SCALE ---------- */
+function renderScale(node){
+  const c = node.criteria.scale;
+  const score = scaleScore(node);
+  const box = document.createElement('div');
+  box.className='crit';
+  box.innerHTML = `<div class="crit-head"><div class="ctitle">3. Масштабность</div><div class="cscore" style="background:${colorFor(score)}22;color:${colorFor(score)}">${score!==null?score+'%':'нет данных'}</div></div>
+    <div class="crit-desc">1) Этапы процесса. 2) Позиции (Позиция 1, 2...). 3) Привяжи этап к позиции. Если разные этапы висят на одной позиции — их делает один человек, масштабность ниже.</div>
+    <div style="margin-bottom:10px;"><b style="font-size:12.5px;">Позиции:</b><div id="posHolder" style="margin-top:6px;"></div><button class="btn secondary small" id="addPosBtn">+ Позиция</button></div>
+    <div style="margin-bottom:6px;"><b style="font-size:12.5px;">Этапы процесса:</b></div>
+    <div id="stageHolder"></div>
+    <button class="btn secondary small" id="addStageBtn">+ Этап</button>
+    <div class="scale-summary" id="scaleSummary"></div>`;
+
+  const posHolder = box.querySelector('#posHolder');
+  function renderPositions(){
+    posHolder.innerHTML='';
+    (c.positions||[]).forEach(p=>{
+      const chip = document.createElement('span');
+      chip.className='pos-chip';
+      chip.innerHTML = `<input type="text" value="${escapeHtml(p.name)}"><button>✕</button>`;
+      chip.querySelector('input').onchange = (e)=>{ p.name = e.target.value; saveTree(); renderStages(); };
+      chip.querySelector('button').onclick = ()=>{
+        c.positions = c.positions.filter(x=>x.id!==p.id);
+        (c.stages||[]).forEach(s=>{ if(s.posId===p.id) s.posId=null; });
+        saveTree(); render();
+      };
+      posHolder.appendChild(chip);
+    });
+  }
+  box.querySelector('#addPosBtn').onclick = ()=>{
+    c.positions = c.positions || [];
+    c.positions.push({id:uid(), name:'Позиция '+((c.positions.length)+1)});
+    saveTree(); render();
+  };
+
+  const stageHolder = box.querySelector('#stageHolder');
+  function renderStages(){
+    stageHolder.innerHTML='';
+    (c.stages||[]).forEach(s=>{
+      const row = document.createElement('div');
+      row.className='scale-stage';
+      let options = `<option value="">— не назначено —</option>` + (c.positions||[]).map(p=>`<option value="${p.id}" ${s.posId===p.id?'selected':''}>${escapeHtml(p.name)}</option>`).join('');
+      row.innerHTML = `<input type="text" class="sname" value="${escapeHtml(s.name)}" placeholder="Название этапа"><select>${options}</select><button class="icon-btn">✕</button>`;
+      row.querySelector('.sname').onchange = (e)=>{ s.name = e.target.value; saveTree(); };
+      row.querySelector('select').onchange = (e)=>{ s.posId = e.target.value || null; saveTree(); renderSummary(); renderTree(); renderPriority(); rerenderHead(); };
+      row.querySelector('button').onclick = ()=>{ c.stages = c.stages.filter(x=>x.id!==s.id); saveTree(); render(); };
+      stageHolder.appendChild(row);
+    });
+  }
+  box.querySelector('#addStageBtn').onclick = ()=>{
+    c.stages = c.stages || [];
+    c.stages.push({id:uid(), name:'Этап '+(c.stages.length+1), posId:null});
+    saveTree(); render();
+  };
+
+  function renderSummary(){
+    const summary = box.querySelector('#scaleSummary');
+    const stages = c.stages||[];
+    if(stages.length===0){ summary.textContent=''; return; }
+    const assigned = stages.filter(s=>s.posId);
+    const distinct = new Set(assigned.map(s=>s.posId)).size;
+    summary.textContent = `Этапов: ${stages.length} · Назначено: ${assigned.length} · Уникальных позиций задействовано: ${distinct} → масштабность ${stages.length?Math.round((distinct/stages.length)*100):0}%`;
+  }
+  function rerenderHead(){
+    const sc = scaleScore(node);
+    box.querySelector('.cscore').textContent = sc!==null?sc+'%':'нет данных';
+    box.querySelector('.cscore').style.background = colorFor(sc)+'22';
+    box.querySelector('.cscore').style.color = colorFor(sc);
+  }
+
+  renderPositions();
+  renderStages();
+  renderSummary();
+  return box;
+}
+
+/* ---------- Init ---------- */
+loadData();
+</script>
+</body>
+</html>
